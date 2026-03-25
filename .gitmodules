@@ -1,3 +1,24 @@
 [submodule "source/rozdzia_22"]
 	path = source/rozdzia_22
 	url = https://github.com/Youarecheck/Bazy_Danych_Tematyczne_Repo_MK.git
+[submodule "rozdzia_21"]
+	path = source/rozdzia_21
+	url = https://github.com/karaskamil/Sprzet-dla-bazy-danych.git
+[submodule "source/rozdzia_23"]
+	path = source/rozdzia_23
+	url = https://github.com/pawlos1337/Bazy-danych-temat.git
+[submodule "source/rozdzia_24"]
+	path = source/rozdzia_24
+	url = https://github.com/OskarProgrammer/monitorowanie_i_diagnostyka.git
+[submodule "source/rozdzia_25"]
+	path = source/rozdzia_25
+	url = https://github.com/KMachoK/Tematyczne.git
+[submodule "source/rozdzia_26"]
+	path = source/rozdzia_26
+	url = https://github.com/domino0472/Partycjonowani-Danych
+[submodule "source/rozdzia_27"]
+	path = source/rozdzia_27
+	url = https://github.com/oski486/BazyDanych-Subject.git
+[submodule "source/rozdzia_28"]
+	path = source/rozdzia_28
+	url = https://github.com/Koko9077/Kopie-zapasowe-i-odzyskiwanie-danych.git
