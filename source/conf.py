@@ -6,7 +6,7 @@ author = 'Gal 2'
 release = '0.0.1'
 
 # General configuration
-extensions = []  # ← USUŃ 'rst2pdf.pdfbuilder'
+extensions = []  
 
 templates_path = ['_templates']
 exclude_patterns = []
