@@ -1,68 +1,28 @@
-=========================================
-Sprawozdanie: Projektowanie bazy danych
-=========================================
 
-:Autor: Michał Kraus
+Rozdział 3: Modelowanie i implementacja bazy danych
+===================================================
 
-Wybór zagadnienia, opis procesów i danych
-=========================================
+W niniejszym rozdziale przedstawiono proces projektowania relacyjnej bazy danych dla sklepu internetowego NautSA specjalizującego się w sprzedaży podzespołów komputerowych i elektronicznych.
 
-**Wybrane zagadnienie:**  
-System obsługi sprzedaży internetowej dla sklepu NautSA specjalizującego się w podzespołach elektronicznych (płyty główne, pamięci RAM, obudowy, procesory, karty graficzne itp.). Projekt obejmuje ewidencjonowanie klientów (zarówno osób fizycznych, jak i firm), katalog produktów, zarządzanie stanami magazynowymi, obsługę zamówień wraz z fakturowaniem oraz śledzenie płatności.
-
-**Opis procesów i więzy integralności:**
-
-Głównym procesem biznesowym jest cykl życia zamówienia.
-
-* **Rejestracja klienta:**  
-  Klient zakłada konto, podając dane osobowe (imię, nazwisko, email, telefon) lub dane firmy (nazwa, NIP). Adresy (dostawowy, fakturowy, korespondencyjny) są przypisywane do konta. Więzy integralności: unikalny adres email, a dla osób fizycznych obowiązkowy PESEL, dla firm – NIP i nazwa firmy (wzajemne wykluczanie).
-
-* **Zarządzanie produktami:**  
-  Każdy produkt posiada nazwę, producenta, cenę jednostkową, typ (enum: płyta główna, pamięć RAM, procesor, karta graficzna, dysk, obudowa, zasilacz, inne) oraz bieżący stan magazynowy. Stan magazynowy nie może być ujemny.
-
-* **Składanie zamówienia:**  
-  Klient tworzy zamówienie, wybierając produkty i ich ilości. Dla każdej pozycji zamówienia zapisywana jest cena z chwili zakupu (cena historyczna), co zabezpiecza przed późniejszymi zmianami cennika. Zamówienie otrzymuje status (przyjęte, opłacone, w realizacji, wysłane, dostarczone, anulowane) oraz metodę płatności (przelew, karta, blik, za pobraniem). Całkowita wartość zamówienia jest obliczana i przechowywana.
-
-* **Płatności i faktury:**  
-  Do zamówienia może zostać wystawiona faktura (relacja 1:1). Faktura posiada unikalny numer, datę wystawienia, kwotę brutto oraz ścieżkę do pliku PDF. Płatność jest rejestrowana poprzez metodę płatności i status (brak osobnej tabeli – atrybuty w zamówieniu).
-
-**Wykaz gromadzonych danych:**
-
-* **Klient:** typ (osoba/firma), imię, nazwisko, nazwa firmy, email, telefon, PESEL, NIP, data utworzenia konta.
-* **Adres:** ulica, numer domu, numer mieszkania, miasto, kod pocztowy, kraj, typ adresu (dostawowy/fakturowy/korespondencyjny).
-* **Produkt:** nazwa, producent, opis, cena jednostkowa, stan magazynowy, typ produktu, data dodania.
-* **Zamówienie:** data złożenia, data wysyłki, status, metoda płatności, wartość całkowita.
-* **Pozycja zamówienia:** liczba sztuk, cena w momencie zakupu.
-* **Faktura:** numer faktury, data wystawienia, kwota brutto, ścieżka pliku.
-
-Prototyp CSV
-============
-
-W celu weryfikacji kompletności i spójności danych przygotowano płaski (zdenormalizowany) plik CSV obrazujący pojedyncze zamówienie wraz z danymi klienta, adresem i produktami.
-
-.. code-block:: csv
-
-    typ_klienta,imie,nazwisko,nazwa_firmy,email,telefon,pesel,nip_firmy,ulica,numer_domu,miasto,kod_pocztowy,typ_adresu,nazwa_produktu,producent,cena_jednostkowa,typ_produktu,ilosc,cena_historyczna,data_zlozenia,status_zamowienia,metoda_platnosci,numer_faktury,kwota_brutto
-    osoba_fizyczna,Jan,Kowalski,,jan.kow@example.com,501234567,90010112345,,Kwiatowa,15,Warszawa,00-001,dostawowy,Płyta główna B450,ASUS,399.99,plyta_glowna,1,399.99,2024-01-15 10:30:00,dostarczone,przelew,FV/2024/01/0001,399.99
-    firma,,,IT-Solutions,biuro@it.pl,503456789,,1234567890,Morska,8,Gdańsk,80-001,dostawowy,Karta graficzna RTX 3060,NVIDIA,1499.99,karta_graficzna,2,1499.99,2024-02-20 14:15:00,wysłane,karta,FV/2024/02/0015,2999.98
+Omówiono model konceptualny, model logiczny, proces normalizacji oraz implementację fizyczną bazy danych w dwóch systemach zarządzania bazami danych: PostgreSQL oraz SQLite.
 
 Model konceptualny (pojęciowy)
-==============================
+------------------------------
 
 Na podstawie analizy procesów i przykładowych danych zdefiniowano model pojęciowy w notacji encja-relacja (ER). Poniżej przedstawiono encje, ich atrybuty, związki oraz zidentyfikowane pułapki.
 
 Zidentyfikowane encje
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 * **KLIENT** – podmiot dokonujący zakupów (osoba fizyczna lub firma).
 * **ADRES** – miejsce dostawy, fakturowania lub korespondencji.
 * **PRODUKT** – towar oferowany w sklepie.
 * **ZAMÓWIENIE** – transakcja zakupu zawierająca informacje o dostawie i płatności.
-* **POZYCJA ZAMÓWIENIA** – encja słaba rozwijająca relację wiele-do-wielu między Zamówieniem a Produktem.
+* **POZYCJA ZAMÓWIENIA** – encja asocjacyjna realizująca relację wiele-do-wielu pomiędzy encjami ZAMÓWIENIE i PRODUKT oraz przechowująca dodatkowe informacje dotyczące transakcji, takie jak liczba sztuk i cena historyczna.
 * **FAKTURA** – dokument rozliczeniowy przypisany do zamówienia.
 
 Atrybuty encji
---------------
+~~~~~~~~~~~~~~
 
 **KLIENT**
 - `id_klienta` (identyfikator numeryczny, klucz główny)
@@ -108,7 +68,7 @@ Atrybuty encji
 - `sciezka_pliku` (ścieżka do pliku PDF)
 
 Opis związków (kardynalności)
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
@@ -150,73 +110,394 @@ Opis związków (kardynalności)
      - 1 : 1 (opcjonalnie)
      - Zamówienie może mieć maksymalnie jedną fakturę; faktura dotyczy jednego zamówienia.
 
-Pułapki w projektowaniu (niepoprawne związki)
----------------------------------------------
 
-**Pułapka wiatraka (chasm trap):**  
-Gdyby bezpośrednio połączono encje **KLIENT** i **PRODUKT** relacją "kupuje", utracona zostałaby informacja o kontekście transakcji – nie wiadomo, w którym zamówieniu i w jakiej cenie produkt został nabyty. Podobnie, pominięcie encji **POZYCJA ZAMÓWIENIA** i połączenie ZAMÓWIENIE–PRODUKT jako M:N spowodowałoby niemożność przechowania liczby sztuk i ceny historycznej.
+Diagram modelu konceptualnego
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Pułapka rozwidlonej ścieżki (fan trap):**  
-Gdyby **ADRES** był połączony bezpośrednio z **ZAMÓWIENIEM** i jednocześnie z **KLIENTEM**, mogłoby to prowadzić do niejednoznaczności – adres dostawy dla zamówienia powinien być wybrany spośród adresów klienta. W modelu rozwiązano to przez przypisanie zamówieniu konkretnego adresu (`adres_dostawy_id`) będącego kluczem obcym do tabeli ADRES, co nie generuje niejednoznaczności.
-
-Encja słaba
------------
-
-**POZYCJA ZAMÓWIENIA** jest encją słabą, ponieważ nie może istnieć bez zarówno **ZAMÓWIENIA**, jak i **PRODUKTU**. Jej klucz główny `id_pozycji` jest sztuczny, ale encja ta rozwiją relację M:N. Atrybuty `liczba_sztuk` i `cena_w_momencie_zakupu` są bezpośrednio zależne od pary (zamówienie, produkt).
-
-Schemat w notacji Chena
------------------------
-
-Poniżej zamieszczono diagram związków encji w notacji Chena, obrazujący model konceptualny bazy danych sklepu NautSA.
+Poniżej zamieszczono diagram związków encji, obrazujący model konceptualny bazy danych sklepu NautSA.
 
 .. figure:: /_static/diagram_koncepcyjny_model.png
-   :align: center
    :alt: Diagram związków encji w notacji Chena
+   :align: center
+   :width: 80%
+   :scale: 70%
+   
 
-   Rysunek 1: Model konceptualny
+   Rysunek 3.1: Model konceptualny w notacji Chena.
 
-Model logiczny i proces normalizacji
-====================================
 
-Przekształcono dane z postaci płaskiej (CSV) do postaci znormalizowanej – trzeciej postaci normalnej (3NF).
 
-Etapy normalizacji
-------------------
 
-**Pierwsza postać normalna (1NF):**  
-Wprowadzono sztuczne identyfikatory `id_zamowienia` i `id_produktu`. Każda komórka zawiera pojedynczą, atomową wartość. Zdefiniowano klucz główny złożony (`id_zamowienia`, `id_produktu`) dla encji Pozycja.
 
-**Druga postać normalna (2NF):**  
-Usunięto częściowe zależności funkcyjne od klucza złożonego:
-- Atrybuty zależne tylko od `id_produktu` (nazwa, producent, cena, stan, typ) przeniesiono do tabeli **PRODUKT**.
-- Atrybuty zależne tylko od `id_zamowienia` (data, status, metoda płatności, wartość całkowita, dane klienta, adres) przeniesiono do tabeli **ZAMÓWIENIE**.
-- Atrybuty zależne od całego klucza (liczba sztuk, cena historyczna) pozostały w **POZYCJA ZAMÓWIENIA**.
 
-**Trzecia postać normalna (3NF):**  
-Usunięto zależności przechodnie:
-- Z **ZAMÓWIENIA** wydzielono dane klienta do tabeli **KLIENT** (w tym dane firm/osób) oraz dane adresowe do tabeli **ADRES**.
-- Z **PRODUKTU** nie wydzielano osobnej kategorii – `typ_produktu` jest atrybutem prostym (enum), nie tworzy nowej encji.
-- **FAKTURA** została wydzielona jako osobna tabela ze względu na możliwość późniejszego wystawienia (opcjonalność).
+Model logiczny
+--------------
 
-Ostateczna struktura tabel (3NF)
---------------------------------
 
-Otrzymano 6 tabel:
 
-1. **klient**
-2. **adres**
-3. **produkt**
-4. **zamowienie**
-5. **pozycja_zamowienia** (encja asocjacyjna)
-6. **faktura**
 
-Model fizyczny bazy danych
-==========================
+Po przeprowadzeniu procesu normalizacji płaskiej struktury danych otrzymano zestaw sześciu tabel spełniających wymagania trzeciej postaci normalnej (3NF). Dla każdej tabeli określono klucz główny, atrybuty oraz relacje z pozostałymi encjami.
+
+Struktura tabel w modelu logicznym
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Tabela **klient**
+^^^^^^^^^^^^^^^^^
+
+Przechowuje dane osobowe i firmowe klientów sklepu. Obsługuje dwa typy podmiotów – osoby fizyczne oraz firmy, z odpowiednimi ograniczeniami integralności.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 15 40
+
+   * - Nazwa kolumny
+     - Typ danych
+     - Klucz
+     - Opis
+
+   * - id_klienta
+     - INTEGER
+     - PK
+     - Unikalny identyfikator klienta (autoinkrementacja)
+
+   * - typ_klienta
+     - TEXT (enum)
+     - -
+     - Określa typ: 'osoba_fizyczna' lub 'firma'
+
+   * - imie
+     - TEXT
+     - -
+     - Imię klienta (dla firm – NULL)
+
+   * - nazwisko
+     - TEXT
+     - -
+     - Nazwisko klienta (dla firm – NULL)
+
+   * - nazwa_firmy
+     - TEXT
+     - -
+     - Nazwa firmy (dla osób fizycznych – NULL)
+
+   * - email
+     - TEXT
+     - UNIQUE
+     - Adres e-mail (unikalny, wymagany)
+
+   * - telefon
+     - TEXT
+     - -
+     - Numer kontaktowy
+
+   * - pesel
+     - TEXT
+     - UNIQUE
+     - PESEL (tylko dla osób fizycznych, unikalny)
+
+   * - nip_firmy
+     - TEXT
+     - UNIQUE
+     - NIP (tylko dla firm, unikalny)
+
+   * - data_utworzenia
+     - DATETIME
+     - -
+     - Data rejestracji konta (domyślnie bieżąca data)
+
+Ograniczenia:
+- Wzajemne wykluczanie PESEL/NIP – klient może mieć wypełniony tylko jeden z tych atrybutów.
+- Dla osób fizycznych: `imie`, `nazwisko` i `pesel` wymagane, `nazwa_firmy` i `nip_firmy` – NULL.
+- Dla firm: `nazwa_firmy` i `nip_firmy` wymagane, `imie`, `nazwisko` i `pesel` – NULL.
+
+Tabela **adres**
+^^^^^^^^^^^^^^^^
+
+Przechowuje adresy przypisane do klientów. Jeden klient może mieć wiele adresów (np. dostawowy, fakturowy, korespondencyjny).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 15 40
+
+   * - Nazwa kolumny
+     - Typ danych
+     - Klucz
+     - Opis
+
+   * - id_adresu
+     - INTEGER
+     - PK
+     - Unikalny identyfikator adresu
+
+   * - ulica
+     - TEXT
+     - -
+     - Nazwa ulicy
+
+   * - numer_domu
+     - TEXT
+     - -
+     - Numer budynku
+
+   * - numer_mieszkania
+     - TEXT
+     - -
+     - Numer mieszkania (opcjonalny)
+
+   * - miasto
+     - TEXT
+     - -
+     - Nazwa miasta
+
+   * - kod_pocztowy
+     - TEXT
+     - -
+     - Kod pocztowy
+
+   * - kraj
+     - TEXT
+     - -
+     - Nazwa kraju (domyślnie 'Polska')
+
+   * - typ_adresu
+     - TEXT (enum)
+     - -
+     - Typ adresu: 'dostawowy', 'fakturowy', 'korespondencyjny'
+
+   * - id_klienta
+     - INTEGER
+     - FK
+     - Identyfikator klienta (klucz obcy do tabeli klient)
+
+Relacje:
+- `id_klienta` odnosi się do `klient.id_klienta`.
+- Kaskadowe usuwanie (`ON DELETE CASCADE`) – usunięcie klienta usuwa wszystkie jego adresy.
+
+Tabela **produkt**
+^^^^^^^^^^^^^^^^^^
+
+Przechowuje dane produktów oferowanych w sklepie, w tym ich stan magazynowy i kategorię.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 15 40
+
+   * - Nazwa kolumny
+     - Typ danych
+     - Klucz
+     - Opis
+
+   * - id_produktu
+     - INTEGER
+     - PK
+     - Unikalny identyfikator produktu
+
+   * - nazwa
+     - TEXT
+     - -
+     - Nazwa produktu (wymagana)
+
+   * - producent
+     - TEXT
+     - -
+     - Nazwa producenta (domyślnie 'Nieznany')
+
+   * - opis
+     - TEXT
+     - -
+     - Dodatkowy opis techniczny (opcjonalny)
+
+   * - cena_jednostkowa
+     - NUMERIC
+     - -
+     - Aktualna cena jednostkowa (>= 0)
+
+   * - stan_magazynowy
+     - INTEGER
+     - -
+     - Liczba dostępnych sztuk (>= 0, domyślnie 0)
+
+   * - typ_produktu
+     - TEXT (enum)
+     - -
+     - Kategoria: 'plyta_glowna', 'pamiec_ram', 'procesor', 'karta_graficzna', 'dysk', 'obudowa', 'zasilacz', 'inne'
+
+   * - data_dodania
+     - DATETIME
+     - -
+     - Data dodania do oferty (domyślnie bieżąca data)
+
+Tabela **zamowienie**
+^^^^^^^^^^^^^^^^^^^^^
+
+Przechowuje dane zamówień złożonych przez klientów, w tym status, metodę płatności i całkowitą wartość.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 15 40
+
+   * - Nazwa kolumny
+     - Typ danych
+     - Klucz
+     - Opis
+
+   * - id_zamowienia
+     - INTEGER
+     - PK
+     - Unikalny identyfikator zamówienia
+
+   * - data_zlozenia
+     - DATETIME
+     - -
+     - Data złożenia zamówienia (domyślnie bieżąca data)
+
+   * - data_wysylki
+     - DATETIME
+     - -
+     - Data wysyłki (opcjonalna, wymaga >= data_zlozenia)
+
+   * - status
+     - TEXT (enum)
+     - -
+     - Status: 'przyjete', 'oplacone', 'w_realizacji', 'wyslane', 'dostarczone', 'anulowane'
+
+   * - metoda_platnosci
+     - TEXT (enum)
+     - -
+     - Metoda płatności: 'przelew', 'karta', 'blik', 'za_pobraniem'
+
+   * - wartosc_calkowita
+     - NUMERIC
+     - -
+     - Całkowita wartość zamówienia (>= 0)
+
+   * - id_klienta
+     - INTEGER
+     - FK
+     - Identyfikator klienta składającego zamówienie
+
+   * - adres_dostawy_id
+     - INTEGER
+     - FK
+     - Identyfikator adresu dostawy
+
+Relacje:
+- `id_klienta` → `klient.id_klienta` (ograniczenie `RESTRICT` – nie można usunąć klienta z zamówieniami).
+- `adres_dostawy_id` → `adres.id_adresu` (ograniczenie `RESTRICT`).
+- `data_wysylki` musi być >= `data_zlozenia` (lub NULL).
+
+Tabela **pozycja_zamowienia**
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Jest to encja asocjacyjna (słaba), która rozwija relację wiele-do-wielu między **Zamówieniem** a **Produktem**. Każdy wiersz odpowiada jednemu produktowi w konkretnym zamówieniu.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 15 40
+
+   * - Nazwa kolumny
+     - Typ danych
+     - Klucz
+     - Opis
+
+   * - id_pozycji
+     - INTEGER
+     - PK
+     - Unikalny identyfikator pozycji
+
+   * - liczba_sztuk
+     - INTEGER
+     - -
+     - Liczba zamówionych sztuk (> 0)
+
+   * - cena_w_momencie_zakupu
+     - NUMERIC
+     - -
+     - Cena jednostkowa z chwili zakupu (historyczna, >= 0)
+
+   * - id_zamowienia
+     - INTEGER
+     - FK
+     - Identyfikator zamówienia
+
+   * - id_produktu
+     - INTEGER
+     - FK
+     - Identyfikator produktu
+
+Relacje:
+- `id_zamowienia` → `zamowienie.id_zamowienia` (`ON DELETE CASCADE`).
+- `id_produktu` → `produkt.id_produktu` (`ON DELETE RESTRICT`).
+- Unikalność pary (`id_zamowienia`, `id_produktu`) – zapobiega duplikowaniu produktu w jednym zamówieniu.
+
+Tabela **faktura**
+^^^^^^^^^^^^^^^^^^
+
+Przechowuje dane faktur wystawionych dla zamówień. Relacja 1:1 z zamówieniem – każde zamówienie może mieć maksymalnie jedną fakturę.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 15 40
+
+   * - Nazwa kolumny
+     - Typ danych
+     - Klucz
+     - Opis
+
+   * - id_faktury
+     - INTEGER
+     - PK
+     - Unikalny identyfikator faktury
+
+   * - numer_faktury
+     - TEXT
+     - UNIQUE
+     - Unikalny numer faktury (wymagany)
+
+   * - data_wystawienia
+     - DATETIME
+     - -
+     - Data wystawienia (domyślnie bieżąca data)
+
+   * - kwota_brutto
+     - NUMERIC
+     - -
+     - Kwota brutto faktury (>= 0)
+
+   * - sciezka_pliku
+     - TEXT
+     - -
+     - Ścieżka do pliku PDF faktury (opcjonalna)
+
+   * - id_zamowienia
+     - INTEGER
+     - FK (UNIQUE)
+     - Identyfikator zamówienia (unikalny – 1:1)
+
+Relacje:
+- `id_zamowienia` → `zamowienie.id_zamowienia` (`ON DELETE RESTRICT`).
+- `UNIQUE` na `id_zamowienia` zapewnia relację 1:1 – do jednego zamówienia można wystawić tylko jedną fakturę.
+
+Diagram modelu logicznego
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Poniżej zamieszczono diagram modelu logicznego w notacji Barkera, obrazujący strukturę tabel, klucze główne, klucze obce oraz relacje między encjami po procesie normalizacji do 3. postaci normalnej.
+
+.. figure:: /_static/diagram_model_logiczny.png
+   :align: center
+   :alt: Diagram modelu logicznego ERD w notacji Barkera
+   :width: 35%
+   :scale: 65%
+
+   Rysunek 3.2: Model logiczny bazy danych NautSA w notacji Barkera.
+
+Model fizyczny
+--------------
 
 Model fizyczny uwzględnia specyfikę dwóch docelowych silników: **PostgreSQL** (produkcyjny, zaawansowany) oraz **SQLite** (lekki, do testów lub zastosowań embedded). Różnice dotyczą typów danych, mechanizmów generowania kluczy głównych, obsługi typów wyliczeniowych (ENUM) oraz precyzji finansowej.
 
 Model fizyczny dla PostgreSQL (skrót)
--------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 PostgreSQL oferuje bogaty zestaw typów danych dostosowanych do potrzeb aplikacji biznesowych:
 
@@ -227,10 +508,35 @@ PostgreSQL oferuje bogaty zestaw typów danych dostosowanych do potrzeb aplikacj
 - Ograniczenia `CHECK` – zapewniające integralność danych.
 - Indeksy – zakładane na kluczach obcych i często używanych kolumnach.
 
-Pełny kod definicji schematu `nautsa` dla PostgreSQL znajduje się w załączonym pliku `sqlcodeElectronicshop.sql`.
+
+**Przykładowy fragment kodu dla PostgreSQL (tabela klient):**
+
+.. code-block:: sql
+
+   CREATE TABLE IF NOT EXISTS nautsa.klient (
+       id_klienta SERIAL PRIMARY KEY,
+
+       typ_klienta nautsa.typ_klienta_enum NOT NULL,
+
+       imie VARCHAR(100),
+       nazwisko VARCHAR(100),
+
+       nazwa_firmy VARCHAR(255),
+
+       email VARCHAR(255) NOT NULL UNIQUE,
+       telefon VARCHAR(20),
+
+       pesel CHAR(11) UNIQUE,
+       nip_firmy VARCHAR(15) UNIQUE,
+
+       data_utworzenia TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+   );
+
+
+Pełny kod definicji bazy danych `nautsa` dla PostgreSQL znajduje się w repozytorium pod linkiem: `kod PostgreSQL <https://github.com/Youarecheck/Bazy_danych_kody_sql_and_ERD/blob/master/postgreseversion.sql>`_.
 
 Model fizyczny dla SQLite
--------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 SQLite jest silnikiem lekkim, często stosowanym w aplikacjach mobilnych, embedded oraz w testach jednostkowych. Dla projektu NautSA przygotowano w pełni funkcjonalny skrypt tworzący bazę danych z zachowaniem wszystkich więzów integralności.
 
@@ -246,27 +552,25 @@ SQLite jest silnikiem lekkim, często stosowanym w aplikacjach mobilnych, embedd
 
 **Przykładowy fragment kodu dla SQLite (tabela klient):**
 
-```sql
-CREATE TABLE klient (
-    id_klienta INTEGER PRIMARY KEY AUTOINCREMENT,
-    typ_klienta TEXT NOT NULL
-        CHECK (typ_klienta IN ('osoba_fizyczna', 'firma')),
-    imie TEXT,
-    nazwisko TEXT,
-    nazwa_firmy TEXT,
-    email TEXT NOT NULL UNIQUE,
-    telefon TEXT,
-    pesel TEXT UNIQUE,
-    nip_firmy TEXT UNIQUE,
-    data_utworzenia DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CHECK (
-        (typ_klienta = 'osoba_fizyczna'
-            AND imie IS NOT NULL AND nazwisko IS NOT NULL
-            AND pesel IS NOT NULL AND nip_firmy IS NULL
-            AND nazwa_firmy IS NULL)
-        OR
-        (typ_klienta = 'firma'
-            AND nazwa_firmy IS NOT NULL AND nip_firmy IS NOT NULL
-            AND pesel IS NULL)
-    )
-);
+.. code-block:: sql
+
+   CREATE TABLE klient (
+       id_klienta INTEGER PRIMARY KEY AUTOINCREMENT,
+       typ_klienta TEXT NOT NULL
+           CHECK (typ_klienta IN ('osoba_fizyczna', 'firma')),
+       imie TEXT,
+       nazwisko TEXT,
+       nazwa_firmy TEXT,
+       email TEXT NOT NULL UNIQUE
+   );
+
+
+Pełny kod definicji bazy danych `nautsa` dla SQLite znajduje się w repozytorium pod linkiem: `kod SQLite <https://github.com/Youarecheck/Bazy_danych_kody_sql_and_ERD/blob/master/sqlLiteversion.sql>`_.
+
+
+.. admonition:: Opracowanie
+   :class: note
+
+   **Autor:** Michał Kraus 
+   **Przedmiot:** Bazy danych  
+   **Data:** czerwiec 2026
