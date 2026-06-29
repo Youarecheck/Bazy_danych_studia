@@ -6,6 +6,61 @@ W niniejszym rozdziale przedstawiono proces projektowania relacyjnej bazy danych
 
 Omówiono model konceptualny, model logiczny, proces normalizacji oraz implementację fizyczną bazy danych w dwóch systemach zarządzania bazami danych: PostgreSQL oraz SQLite.
 
+Przykładowe pliki danych (JSON / CSV)
+-------------------------------------
+
+Przed przystąpieniem do modelowania przygotowano prototypowe pliki zawierające pojedynczą linię danych. Miały one na celu weryfikację kompletności gromadzonych informacji oraz ułatwienie testowania struktury bazy danych w obu docelowych systemach.
+
+**Dane dla SQLite:**
+
+.. list-table:: Przykładowe dane dla SQLite
+   :header-rows: 1
+   :widths: 50 50
+
+   * - CSV
+     - JSON
+   * - .. code-block:: csv
+
+          T001,2026-06-01 10:30:00,dostarczone,blik,1,Jan,Kowalski,jan@email.com,Kwiatowa,5,Warszawa,00-001,P001,Płyta główna,349.99,2,349.99,FV/001,699.98
+
+     - .. code-block:: json
+
+          {
+            "id": "T001",
+            "data": "2026-06-01 10:30:00",
+            "status": "dostarczone",
+            "klient": "Jan Kowalski",
+            "produkt": "Płyta główna",
+            "cena": 349.99,
+            "sztuk": 2,
+            "faktura": "FV/001"
+          }
+
+**Dane dla PostgreSQL:**
+
+.. list-table:: Przykładowe dane dla PostgreSQL
+   :header-rows: 1
+   :widths: 50 50
+
+   * - CSV
+     - JSON
+   * - .. code-block:: csv
+
+          T001,2026-06-01 10:30:00+02,dostarczone,blik,1,Jan,Kowalski,jan@email.com,Kwiatowa,5,Warszawa,00-001,P001,Płyta główna,349.99,2,349.99,FV/001,699.98
+
+     - .. code-block:: json
+
+          {
+            "id": "T001",
+            "data": "2026-06-01T10:30:00+02:00",
+            "status": "dostarczone",
+            "klient": "Jan Kowalski",
+            "produkt": "Płyta główna",
+            "cena": 349.99,
+            "sztuk": 2,
+            "faktura": "FV/001"
+          }
+
 Model konceptualny (pojęciowy)
 ------------------------------
 
@@ -566,6 +621,8 @@ SQLite jest silnikiem lekkim, często stosowanym w aplikacjach mobilnych, embedd
 
 
 Pełny kod definicji bazy danych `nautsa` dla SQLite znajduje się w repozytorium pod linkiem: `kod SQLite <https://github.com/Youarecheck/Bazy_danych_kody_sql_and_ERD/blob/master/sqlLiteversion.sql>`_.
+
+Wszystkie zasoby: `github <https://github.com/Youarecheck/Bazy_danych_kody_sql_and_ERD.git>`_
 
 
 .. admonition:: Opracowanie
